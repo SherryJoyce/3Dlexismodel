@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const { Pool } = require("pg");
 
@@ -18,7 +19,7 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-// Search API
+// Search API using full_property_view
 app.get("/api/search", async (req, res) => {
   const q = req.query.q;
 
@@ -28,20 +29,24 @@ app.get("/api/search", async (req, res) => {
 
   try {
     const query = `
-  SELECT su.id, p.name, p.uid, p.type, p.model_id
-  FROM spatial_unit su
-  JOIN party p ON su.pid = p.pid
-  WHERE p.name ILIKE $1 OR p.uid ILIKE $1 OR p.type ILIKE $1
-  LIMIT 20
-`;
+      SELECT party_name, id_number, model_id
+      FROM full_property_view
+      WHERE party_name ILIKE $1 OR id_number ILIKE $1
+      LIMIT 20
+    `;
 
     const result = await pool.query(query, [`%${q}%`]);
-    console.log(`Found ${result.rows.length} results`); // Debug
+    console.log(`Found ${result.rows.length} results`);
     res.json(result.rows);
   } catch (err) {
-    console.error("Search error:", err);
-    res.status(500).json({ error: err.message }); //more detailed error
+    console.error("Search error:", err.message);
+    res.status(500).json({ error: "Internal server error during search." });
   }
+});
+
+// Serve index.html for the root route
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 app.listen(port, () => {
