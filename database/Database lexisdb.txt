@@ -852,10 +852,22 @@ INSERT INTO spatial_unit (suid, uid, type , pid, vertical_extent) VALUES
 
 
 
--- Optional Views
+-- Create Views
 CREATE VIEW LA_SpatialUnit AS SELECT * FROM spatial_unit WHERE type = 'land';
 
 CREATE VIEW MC_SpatialUnit AS SELECT * FROM spatial_unit WHERE type = 'marine';
+
+CREATE VIEW search_view AS
+SELECT s.suid, b.uid, p.name, s.type, s.vertical_extent
+FROM spatial_unit s
+JOIN baunit b ON s.uid = b.uid
+JOIN party p ON s.pid = p.pid;
+
+
+-- CREATE INDEX
+CREATE INDEX idx_party_name ON party(name);
+CREATE INDEX idx_party_pid ON party(pid);
+CREATE INDEX idx_party_id_number ON party(id_number);
 
 
 
