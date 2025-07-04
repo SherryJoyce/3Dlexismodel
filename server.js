@@ -29,14 +29,18 @@ app.get("/api/search", async (req, res) => {
 
   try {
     const query = `
-      SELECT party_name, id_number, model_id
+      SELECT party_name, id_number
       FROM full_property_view
       WHERE party_name ILIKE $1 OR id_number ILIKE $1
       LIMIT 20
     `;
 
+    console.log("Execute query:", query);
+    console.log("Search parameter:", `%${q}%`);
+
     const result = await pool.query(query, [`%${q}%`]);
     console.log(`Found ${result.rows.length} results`);
+    console.log("Query result:", result.rows); // Log actual rows returned
     res.json(result.rows);
   } catch (err) {
     console.error("Search error:", err.message);
