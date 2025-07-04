@@ -857,17 +857,65 @@ CREATE VIEW LA_SpatialUnit AS SELECT * FROM spatial_unit WHERE type = 'land';
 
 CREATE VIEW MC_SpatialUnit AS SELECT * FROM spatial_unit WHERE type = 'marine';
 
-CREATE VIEW search_view AS
-SELECT s.suid, b.uid, p.name, s.type, s.vertical_extent
-FROM spatial_unit s
-JOIN baunit b ON s.uid = b.uid
-JOIN party p ON s.pid = p.pid;
+CREATE VIEW full_property_view AS
+SELECT
+  p.name AS party_name,
+  p.party_type,
+  p.id_number,
+  p.address,
+  p.email,
+  p.model_id,
+
+  b.uid AS baunit_uid,
+  b.type AS baunit_type,
+  b.status AS baunit_status,
+  b.registration_date,
+  b.category AS baunit_category,
+  b.ownership_type,
+
+  s.suid AS spatial_suid,
+  s.type AS spatial_type,
+  s.vertical_extent,
+
+  r.rrr_id,
+  r.rrr_type
+FROM party p
+JOIN baunit b ON p.pid = b.pid
+LEFT JOIN spatial_unit s ON b.uid = s.uid
+LEFT JOIN rrr r ON b.uid = r.uid AND p.pid = r.pid;
 
 
 -- CREATE INDEX
 CREATE INDEX idx_party_name ON party(name);
 CREATE INDEX idx_party_pid ON party(pid);
 CREATE INDEX idx_party_id_number ON party(id_number);
+
+-- JOIN ALL TABLES
+SELECT
+  p.name AS party_name,
+  p.party_type,
+  p.id_number,
+  p.address,
+  p.email,
+  p.model_id,
+
+  b.uid AS baunit_uid,
+  b.type AS baunit_type,
+  b.status AS baunit_status,
+  b.registration_date,
+  b.category AS baunit_category,
+  b.ownership_type,
+
+  s.suid AS spatial_suid,
+  s.type AS spatial_type,
+  s.vertical_extent,
+
+  r.rrr_id,
+  r.rrr_type
+FROM party p
+JOIN baunit b ON p.pid = b.pid
+LEFT JOIN spatial_unit s ON b.uid = s.uid
+LEFT JOIN rrr r ON b.uid = r.uid AND p.pid = r.pid;
 
 
 
