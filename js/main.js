@@ -19,7 +19,7 @@ try {
     tileset.style = new Cesium.Cesium3DTileStyle(extras.ion.defaultStyle);
   }
 } catch (error) {
-  console.log(error);
+  console.error("Error loading tileset:", error);
 }
 
 let selected = {
@@ -63,13 +63,38 @@ function showInfoBox(feature) {
   infoBox.innerHTML = "";
   infoBox.classList.remove("hidden");
 
-  const props = feature.getPropertyNames();
-  props.forEach((prop) => {
-    const value = feature.getProperty(prop);
-    const div = document.createElement("div");
-    div.innerHTML = `<strong>${prop}</strong>: ${value}`;
-    infoBox.appendChild(div);
-  });
+  if (!feature || !(feature instanceof Cesium.Cesium3DTileFeature)) {
+    infoBox.innerHTML = "<div>No valid feature selected</div>";
+    return;
+  }
+
+  try {
+    const props = feature.getPropertyNames();
+    if (!props || props.length === 0) {
+      // Fallback: Use feature._properties if getPropertyNames() is unavailable
+      const fallbackProps = feature._properties || {};
+      if (Object.keys(fallbackProps).length === 0) {
+        infoBox.innerHTML = "<div>No properties found.</div>";
+        return;
+      }
+
+      for (const [prop, value] of Object.entries(fallbackProps)) {
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${prop}</strong>: ${value}`;
+        infoBox.appendChild(div);
+      }
+    } else {
+      props.forEach((prop) => {
+        const value = feature.getProperty(prop);
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${prop}</strong>: ${value}`;
+        infoBox.appendChild(div);
+      });
+    }
+  } catch (error) {
+    //infoBox.innerHTML = `<div>Error: ${error.message}</div>`;
+    console.error("Error in showInfoBox:", error);
+  }
 }
 
 function hideInfoBox() {
@@ -112,8 +137,10 @@ searchInput.addEventListener("input", async () => {
     } else {
       results.forEach((item) => {
         const li = document.createElement("li");
-        li.textContent = `${item.name || "Unnamed"} (${item.uid || "No ID"})`;
-        li.onclick = () => handleSearchSelection(item.model_id);
+        li.textContent = `${item.party_name || "Unnamed"} — ID Number: ${
+          item.id_number || "N/A"
+        }, Model ID: ${item.model_id || "N/A"}`;
+        li.onclick = () => handleSearchSelection(item.id_number); // Pass id_number
         searchResults.appendChild(li);
       });
     }
@@ -126,49 +153,34 @@ searchInput.addEventListener("input", async () => {
   }
 });
 
-async function handleSearchSelection(modelId) {
+async function handleSearchSelection(idNumber) {
   searchInput.value = "";
   searchResults.classList.add("hidden");
 
-  // Find the 3D model with this model_id
   const tileset = viewer.scene.primitives._primitives.find(
     (p) => p instanceof Cesium.Cesium3DTileset
   );
 
-  const content = tileset._root.content;
-  let found = false;
+  if (!tileset) {
+    console.error("Tileset not found");
+    return;
+  }
 
-  tileset.tileVisible.addEventListener((tile) => {
-    for (let i = 0; i < tile.content.featuresLength; i++) {
-      const feature = tile.content.getFeature(i);
-      if (feature.getProperty("model_id") === modelId) {
-        highlightFeature(feature);
-        found = true;
-        break;
-      }
-    }
-  });
-
-  viewer.scene.requestRender(); // Force redraw
-
-  // Optionally fetch and show infoBox immediately
-  const feature = await findFeatureByModelId(modelId);
-  if (feature) showInfoBox(feature);
-}
-
-// Helper function: manually search model
-async function findFeatureByModelId(modelId) {
-  const tileset = viewer.scene.primitives._primitives.find(
-    (p) => p instanceof Cesium.Cesium3DTileset
-  );
   let foundFeature = null;
 
-  await tileset.readyPromise;
-
+  // Traverse tiles to find the matching feature
   tileset.tileVisible.addEventListener((tile) => {
     for (let i = 0; i < tile.content.featuresLength; i++) {
       const feature = tile.content.getFeature(i);
-      if (feature.getProperty("model_id") === modelId) {
+      const featureIdNumber = feature.getProperty("id_number");
+
+      if (featureIdNumber === idNumber) {
+        console.log("Found matching feature:", feature);
+        highlightFeature(feature);
+        viewer.flyTo(feature, {
+          offset: new Cesium.HeadingPitchRange(0, -0.5, 10),
+        });
+        showInfoBox(feature);
         foundFeature = feature;
         break;
       }
@@ -176,5 +188,29 @@ async function findFeatureByModelId(modelId) {
   });
 
   viewer.scene.requestRender();
-  return foundFeature;
+
+  if (foundFeature) {
+    highlightFeature(foundFeature);
+    viewer.flyTo(foundFeature, {
+      offset: new Cesium.HeadingPitchRange(0, -0.5, 10),
+    });
+    showInfoBox(foundFeature);
+  } else {
+    console.warn(`No feature found for id_number: ${idNumber}`);
+  }
+}
+
+function highlightFeature(feature) {
+  if (!feature) return;
+
+  if (Cesium.defined(selected.feature)) {
+    selected.feature.color = selected.originalColor;
+  }
+
+  selected.feature = feature;
+  selected.originalColor = Cesium.Color.clone(
+    feature.color,
+    new Cesium.Color()
+  );
+  feature.color = Cesium.Color.RED.withAlpha(0.7);
 }
